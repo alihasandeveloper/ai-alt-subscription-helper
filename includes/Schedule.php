@@ -19,8 +19,109 @@ class Schedule
         error_log('AI Alt Subscription Helper (Schedule): ' . $message);
     }
 
-    public function altg_reset_monthly_subscription_credit()
-    {
+//    public function altg_reset_monthly_subscription_credit()
+//    {
+//        $batch_size = 50;
+//        $offset = 0;
+//        $today = date('Y-m-d');
+//
+//        while (true) {
+//            $users = get_users([
+//                'meta_query' => [
+//                    [
+//                        'key' => 'altg_subscriptions',
+//                        'compare' => 'EXISTS',
+//                    ],
+//                ],
+//                'number' => $batch_size,
+//                'offset' => $offset,
+//            ]);
+//
+//            if (empty($users))
+//                break;
+//
+//            foreach ($users as $user) {
+//                $user_id = $user->ID;
+//
+//                $available_token = intval(get_user_meta($user_id, 'altg_available_token', true));
+//                $total_token = intval(get_user_meta($user_id, 'altg_total_token', true));
+//                $subscriptions = get_user_meta($user_id, 'altg_subscriptions', true);
+//
+//                if (!is_array($subscriptions))
+//                    continue;
+//
+//                $modified = false;
+//
+//                foreach ($subscriptions as $key => $subscription) {
+//
+//                    $plan_type = $subscription['plan_type'] ?? '';
+//                    $reset_date = $subscription['reset_date'] ?? '';
+//                    $limit = intval($subscription['credit_limit'] ?? 0);
+//                    $expired_date = $subscription['expired_date'] ?? '';
+//                    $is_expired   = $subscription['is_expired'] ?? false;
+//
+//                    if ($is_expired) continue;
+//
+//                    // 1. Ignore Onetime plans from scheduling
+//                    if ($plan_type === 'onetime')
+//                        continue;
+//
+//                    // 2. Handle expiry FIRST
+//                    if (!empty($expired_date) && $today >= $expired_date) {
+//                        $subscriptions[$key]['is_expired'] = true;
+//                        $subscriptions[$key]['expired_date'] = $today;
+//                        $this->log("User {$user_id} {$plan_type} plan expired");
+//                        $modified = true;
+//                        continue;
+//                    }
+//
+//                    // 3. Only process when reset date reached
+//                    if ($today < $reset_date)
+//                        continue;
+//
+//                    $modified = true;
+//
+//                    // Logic: Monthly deduction for Monthly plans (Drain unused quota)
+//                    if ($plan_type === 'monthly') {
+//                        $deduct = min($available_token, $limit);
+//                        $available_token = max(0, $available_token - $deduct);
+////                        $total_token = max(0, $total_token - $deduct);
+//
+//                        $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
+//                        $this->log("Monthly quota drain for user {$user_id}");
+//                    }
+//                    // Logic: Reset for Yearly plans (Monthly credits reset)
+//                    elseif ($plan_type === 'yearly') {
+//                        // 1. Remove old month's balance (drain unused quota)
+//                        $deduct = min($available_token, $limit);
+//                        $available_token = max(0, $available_token - $deduct);
+////                        $total_token = max(0, $total_token - $deduct);
+//
+//                        // 2. Add new month's credits (Reset)
+//                        $available_token += $limit;
+////                        $total_token += $limit;
+//
+//                        $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
+//                        $this->log("Yearly monthly reset: user {$user_id}, +{$limit}");
+//                    }
+//                }
+//
+//                if ($modified) {
+//                    update_user_meta($user_id, 'altg_available_token', $available_token);
+////                    update_user_meta($user_id, 'altg_total_token', $total_token);
+//                    update_user_meta($user_id, 'altg_subscriptions', $subscriptions);
+//                }
+//            }
+//
+//            $offset += $batch_size;
+//
+//            if ($offset > 100000)
+//                break;
+//        }
+//    }
+
+
+    public function altg_reset_monthly_subscription_credit() {
         $batch_size = 50;
         $offset = 0;
         $today = date('Y-m-d');
@@ -37,34 +138,28 @@ class Schedule
                 'offset' => $offset,
             ]);
 
-            if (empty($users))
-                break;
+            if (empty($users)) break;
 
             foreach ($users as $user) {
                 $user_id = $user->ID;
-
                 $available_token = intval(get_user_meta($user_id, 'altg_available_token', true));
                 $total_token = intval(get_user_meta($user_id, 'altg_total_token', true));
                 $subscriptions = get_user_meta($user_id, 'altg_subscriptions', true);
 
-                if (!is_array($subscriptions))
-                    continue;
-
+                if (!is_array($subscriptions)) continue;
                 $modified = false;
 
                 foreach ($subscriptions as $key => $subscription) {
-
                     $plan_type = $subscription['plan_type'] ?? '';
                     $reset_date = $subscription['reset_date'] ?? '';
                     $limit = intval($subscription['credit_limit'] ?? 0);
                     $expired_date = $subscription['expired_date'] ?? '';
-                    $is_expired = !empty($subscription['is_expired']);
+                    $is_expired = $subscription['is_expired'] ?? false;
 
-                    // 1. Ignore Onetime plans from scheduling
-                    if ($plan_type === 'onetime')
-                        continue;
+                    // Skip expired or onetime plans
+                    if ($is_expired || $plan_type === 'onetime') continue;
 
-                    // 2. Handle expiry FIRST
+                    // Handle expiry
                     if (!empty($expired_date) && $today >= $expired_date) {
                         $subscriptions[$key]['is_expired'] = true;
                         $subscriptions[$key]['expired_date'] = $today;
@@ -73,48 +168,36 @@ class Schedule
                         continue;
                     }
 
-                    // 3. Only process when reset date reached
-                    if ($today < $reset_date)
-                        continue;
+                    // Skip if reset date not reached
+                    if ($today < $reset_date) continue;
 
                     $modified = true;
 
-                    // Logic: Monthly deduction for Monthly plans (Drain unused quota)
+                    // Monthly plan: drain unused quota
                     if ($plan_type === 'monthly') {
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);
-                        $total_token = max(0, $total_token - $deduct);
-
                         $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
-                        $this->log("Monthly quota drain for user {$user_id}");
+                        $this->log("Monthly quota drained for user {$user_id}");
                     }
-                    // Logic: Reset for Yearly plans (Monthly credits reset)
+                    // Yearly plan: drain old quota + add new monthly credit
                     elseif ($plan_type === 'yearly') {
-                        // 1. Remove old month's balance (drain unused quota)
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);
-//                        $total_token = max(0, $total_token - $deduct);
-
-                        // 2. Add new month's credits (Reset)
                         $available_token += $limit;
-//                        $total_token += $limit;
-
                         $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
-                        $this->log("Yearly monthly reset: user {$user_id}, +{$limit}");
+                        $this->log("Yearly monthly reset for user {$user_id}, +{$limit}");
                     }
                 }
 
                 if ($modified) {
                     update_user_meta($user_id, 'altg_available_token', $available_token);
-                    update_user_meta($user_id, 'altg_total_token', $total_token);
                     update_user_meta($user_id, 'altg_subscriptions', $subscriptions);
                 }
             }
 
             $offset += $batch_size;
-
-            if ($offset > 100000)
-                break;
+            if ($offset > 100000) break;
         }
     }
 }
