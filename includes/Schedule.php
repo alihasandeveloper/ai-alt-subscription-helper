@@ -156,31 +156,30 @@ class Schedule
                     $expired_date = $subscription['expired_date'] ?? '';
                     $is_expired = $subscription['is_expired'] ?? false;
 
-                    // Skip expired or onetime plans
                     if ($is_expired || $plan_type === 'onetime') continue;
 
-                    // Handle expiry
                     if (!empty($expired_date) && $today >= $expired_date) {
+                        // Drain remaining credits on natural expiration
+                        $deduct = min($available_token, $limit);
+                        $available_token = max(0, $available_token - $deduct);
+
                         $subscriptions[$key]['is_expired'] = true;
                         $subscriptions[$key]['expired_date'] = $today;
-                        $this->log("User {$user_id} {$plan_type} plan expired");
+                        $this->log("User {$user_id} {$plan_type} plan expired and credits drained");
                         $modified = true;
                         continue;
                     }
 
-                    // Skip if reset date not reached
                     if ($today < $reset_date) continue;
 
                     $modified = true;
 
-                    // Monthly plan: drain unused quota
                     if ($plan_type === 'monthly') {
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);
                         $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
                         $this->log("Monthly quota drained for user {$user_id}");
                     }
-                    // Yearly plan: drain old quota + add new monthly credit
                     elseif ($plan_type === 'yearly') {
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);

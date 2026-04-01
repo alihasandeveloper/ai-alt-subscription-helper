@@ -172,6 +172,29 @@ class Subscription
         $processed[] = $renewal_key;
         update_user_meta($user_id, 'altg_processed_renewal_events', $processed);
 
+        $history = get_user_meta($user_id, 'altg_subscriptions', true) ?: [];
+        $modified = false;
+
+        foreach ($history as &$entry) {
+            if ($entry['sub_id'] == $id) {
+                // Push both reset and expired dates forward
+                if ($entry['plan_type'] === 'yearly') {
+                    $entry['expired_date'] = date('Y-m-d', strtotime($entry['expired_date'] . ' +1 year'));
+                    $entry['reset_date'] = date('Y-m-d', strtotime($entry['reset_date'] . ' +1 month'));
+                } elseif ($entry['plan_type'] === 'monthly') {
+                    $entry['expired_date'] = date('Y-m-d', strtotime($entry['expired_date'] . ' +1 month'));
+                    $entry['reset_date'] = date('Y-m-d', strtotime($entry['reset_date'] . ' +1 month'));
+                }
+                $entry['is_expired'] = false;
+                $modified = true;
+                break;
+            }
+        }
+
+        if ($modified) {
+            update_user_meta($user_id, 'altg_subscriptions', $history);
+        }
+
         $this->update_subscription($user_id, $title);
     }
 
@@ -218,14 +241,19 @@ class Subscription
                 $entry['credit_limit'] = $new_limit;
                 $entry['price_id'] = $price_id;
 
-                // Update reset date for new cycle if needed
+                // Update dates for new cycle
                 if ($new_plan === 'yearly') {
+                    $entry['expired_date'] = date('Y-m-d', strtotime('+1 year'));
                     $entry['reset_date'] = date('Y-m-d', strtotime('+1 month'));
                 } elseif ($new_plan === 'monthly') {
+                    $entry['expired_date'] = date('Y-m-d', strtotime('+1 month'));
                     $entry['reset_date'] = date('Y-m-d', strtotime('+1 month'));
                 } else {
+                    $entry['expired_date'] = '';
                     $entry['reset_date'] = '';
                 }
+
+                $entry['is_expired'] = false; // Reset expiration on upgrade/update
 
                 $found = true;
                 break;
