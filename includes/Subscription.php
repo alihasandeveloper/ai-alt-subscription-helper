@@ -182,14 +182,10 @@ class Subscription
             return;
 
         $user_id = $user->ID;
-        $event_id = $purchase->id ?? null;
+        $purchase_id = $purchase->id ?? null;
         $price_id = $purchase->price ?? null;
 
-        if (!$event_id || !$price_id)
-            return;
-
-        $processed = get_user_meta($user_id, 'altg_processed_update_events', true) ?: [];
-        if (in_array($event_id, $processed))
+        if (!$purchase_id || !$price_id)
             return;
 
         $post = $this->get_product_by_price_id($price_id);
@@ -200,19 +196,54 @@ class Subscription
         $new_plan = $this->detect_plan_type($title);
         $new_limit = intval(get_post_meta($post->ID, 'credits', true));
 
-        // Update tokens for switched plan
         $available = intval(get_user_meta($user_id, 'altg_available_token', true));
         $total = intval(get_user_meta($user_id, 'altg_total_token', true));
 
-        // Logic: Add new credits (SureCart handles the swap timing)
-        update_user_meta($user_id, 'altg_available_token', $available + $new_limit);
-        update_user_meta($user_id, 'altg_total_token', $total + $new_limit);
+        $history = get_user_meta($user_id, 'altg_subscriptions', true) ?: [];
+        $found = false;
+
+        foreach ($history as &$entry) {
+            if ($entry['sub_id'] === $purchase_id) {
+                // Deduct old credits
+                $old_limit = intval($entry['credit_limit'] ?? 0);
+                $available = max(0, $available - $old_limit);
+                $total = max(0, $total - $old_limit);
+
+                // Add new credits
+                $available += $new_limit;
+                $total += $new_limit;
+
+                // Update entry
+                $entry['plan_type'] = $new_plan;
+                $entry['credit_limit'] = $new_limit;
+                $entry['price_id'] = $price_id;
+
+                // Update reset date for new cycle if needed
+                if ($new_plan === 'yearly') {
+                    $entry['reset_date'] = date('Y-m-d', strtotime('+1 month'));
+                } elseif ($new_plan === 'monthly') {
+                    $entry['reset_date'] = date('Y-m-d', strtotime('+1 month'));
+                } else {
+                    $entry['reset_date'] = '';
+                }
+
+                $found = true;
+                break;
+            }
+        }
+
+        if (!$found) {
+            // Treat as new if not found in history (unlikely if already updated)
+            $available += $new_limit;
+            $total += $new_limit;
+            $this->push_subscription_history($user_id, $new_plan, $new_limit, $purchase_id, $price_id);
+        } else {
+            update_user_meta($user_id, 'altg_subscriptions', $history);
+        }
+
+        update_user_meta($user_id, 'altg_available_token', $available);
+        update_user_meta($user_id, 'altg_total_token', $total);
         update_user_meta($user_id, 'altg_subscription_type', $new_plan);
-
-        $processed[] = $event_id;
-        update_user_meta($user_id, 'altg_processed_update_events', $processed);
-
-        $this->push_subscription_history($user_id, $new_plan, $new_limit, $event_id, $price_id);
         $this->update_subscription($user_id, $title);
     }
 
@@ -231,16 +262,14 @@ class Subscription
         $history = get_user_meta($user_id, 'altg_subscriptions', true);
         if (is_array($history)) {
             $available = intval(get_user_meta($user_id, 'altg_available_token', true));
-            $total = intval(get_user_meta($user_id, 'altg_total_token', true));
 
             foreach ($history as &$entry) {
                 // If this specific purchase is being cancelled
                 if ($entry['sub_id'] == $purchase_id && empty($entry['is_expired'])) {
                     $deduct = intval($entry['credit_limit']);
 
-                    // Decrease available and total based on plan limit
+                    // Decrease available balance only per user request
                     $available = max(0, $available - $deduct);
-                    $total = max(0, $total - $deduct);
 
                     $entry['is_expired'] = true;
                     $entry['expired_date'] = date('Y-m-d');
@@ -248,7 +277,6 @@ class Subscription
             }
 
             update_user_meta($user_id, 'altg_available_token', $available);
-            update_user_meta($user_id, 'altg_total_token', $total);
             update_user_meta($user_id, 'altg_subscriptions', $history);
         }
     }

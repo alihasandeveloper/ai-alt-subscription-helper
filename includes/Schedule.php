@@ -75,26 +75,23 @@ class Schedule
 
                     $modified = true;
 
-                    // Logic: Monthly deduction for Monthly plans
+                    // Logic: Monthly deduction for Monthly plans (Drain unused quota)
                     if ($plan_type === 'monthly') {
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);
-
-                        // Also sync total_token (Monthly quota drain)
                         $total_token = max(0, $total_token - $deduct);
 
                         $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
-                        $this->log("Monthly drain for user {$user_id}");
+                        $this->log("Monthly quota drain for user {$user_id}");
                     }
-
                     // Logic: Reset for Yearly plans (Monthly credits reset)
                     elseif ($plan_type === 'yearly') {
-                        // Deduct old month's balance (if any left from the quota)
+                        // 1. Remove old month's balance (drain unused quota)
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);
                         $total_token = max(0, $total_token - $deduct);
 
-                        // Add new month's credits
+                        // 2. Add new month's credits (Reset)
                         $available_token += $limit;
                         $total_token += $limit;
 
