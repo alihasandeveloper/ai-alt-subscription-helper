@@ -84,9 +84,12 @@ class Schedule
                         $available_token = max(0, $available_token - $deduct);
                         $total_token = max(0, $total_token - $deduct);
 
+                        $unused_old = $limit - $deduct;
+                        $total_token = max(0, $total_token - $unused_old);
+
                         $available_token += $limit;
                         $total_token += $limit;
-                        
+
                         $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
                         $this->log("Yearly monthly reset for user {$user_id}, +{$limit}");
                     }
