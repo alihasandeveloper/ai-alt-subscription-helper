@@ -1,0 +1,16 @@
+{
+    "name": "aliha/ai-alt-subscription-helper",
+    "description": "Surecart subs helper",
+    "autoload": {
+        "psr-4": {
+            "Aliha\\AiAltSubscriptionHelper\\": "includes/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Ali Hasan",
+            "email": "alihasandeveloper@gmail.com"
+        }
+    ],
+    "require": {}
+}
