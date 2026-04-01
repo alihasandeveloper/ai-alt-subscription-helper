@@ -159,9 +159,9 @@ class Schedule
                     if ($is_expired || $plan_type === 'onetime') continue;
 
                     if (!empty($expired_date) && $today >= $expired_date) {
-                        // Drain remaining credits on natural expiration
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);
+                        $total_token = max(0, $total_token - $deduct);
 
                         $subscriptions[$key]['is_expired'] = true;
                         $subscriptions[$key]['expired_date'] = $today;
@@ -177,13 +177,18 @@ class Schedule
                     if ($plan_type === 'monthly') {
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);
+                        $total_token = max(0, $total_token - $deduct);
                         $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
                         $this->log("Monthly quota drained for user {$user_id}");
                     }
                     elseif ($plan_type === 'yearly') {
                         $deduct = min($available_token, $limit);
                         $available_token = max(0, $available_token - $deduct);
+                        $total_token = max(0, $total_token - $deduct);
+
                         $available_token += $limit;
+                        $total_token += $limit;
+                        
                         $subscriptions[$key]['reset_date'] = date('Y-m-d', strtotime($reset_date . ' +1 month'));
                         $this->log("Yearly monthly reset for user {$user_id}, +{$limit}");
                     }
@@ -191,6 +196,7 @@ class Schedule
 
                 if ($modified) {
                     update_user_meta($user_id, 'altg_available_token', $available_token);
+                    update_user_meta($user_id, 'altg_total_token', $total_token);
                     update_user_meta($user_id, 'altg_subscriptions', $subscriptions);
                 }
             }
