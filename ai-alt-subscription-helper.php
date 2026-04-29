@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Alt Subscription Helper
  * Description: Custom helper for SureCart subscription automation
- * Version: 1.0
+ * Version: 1.0.1
  * Author: Boomdevs LLC
  * Author URI: https://boomdevs.com
  */
@@ -30,33 +30,3 @@ function ai_alt_subscription_helper_init()
 }
 
 ai_alt_subscription_helper_init();
-
-
-
-function get_free_users($offset = 0, $limit = 100)
-{
-    return get_users([
-        'meta_query' => [
-            'relation' => 'AND',
-            [
-                'key' => 'altg_total_token',
-                'value' => 40,
-                'compare' => '=',
-                'type' => 'NUMERIC',
-            ],
-            [
-                'key' => 'altg_available_token',
-                'value' => 40,
-                'compare' => '!=',
-                'type' => 'NUMERIC',
-            ],
-        ],
-        'fields' => ['ID', 'user_login', 'user_email'],
-        'number' => $limit,
-        'offset' => $offset,
-    ]);
-}
-
-$users = get_free_users();
-
-$i = 1;
