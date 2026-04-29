@@ -1,6 +1,7 @@
 <?php
 
 namespace Aliha\AiAltSubscriptionHelper;
+use Aliha\AiAltSubscriptionHelper\AddFreeCredit;
 
 class Schedule
 {
@@ -12,6 +13,12 @@ class Schedule
     public function atg_every_twelve_hours()
     {
         $this->altg_reset_monthly_subscription_credit();
+        $this->alth_reset_free_users_credit();
+    }
+
+    public function alth_reset_free_users_credit()
+    {
+        AddFreeCredit::reset_free_users_credit();
     }
 
     private function log(string $message): void
