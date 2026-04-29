@@ -22,7 +22,8 @@ register_deactivation_hook(__FILE__, ['\Aliha\AiAltSubscriptionHelper\Installer'
 /**
  * Initialize the plugin classes
  */
-function ai_alt_subscription_helper_init() {
+function ai_alt_subscription_helper_init()
+{
     // error_log('AI Alt Subscription Helper: Initializing...');
     $helper = \Aliha\AiAltSubscriptionHelper\AiAltTextHelper::get_instance();
     $helper->run();
@@ -30,3 +31,32 @@ function ai_alt_subscription_helper_init() {
 
 ai_alt_subscription_helper_init();
 
+
+
+function get_free_users($offset = 0, $limit = 100)
+{
+    return get_users([
+        'meta_query' => [
+            'relation' => 'AND',
+            [
+                'key' => 'altg_total_token',
+                'value' => 40,
+                'compare' => '=',
+                'type' => 'NUMERIC',
+            ],
+            [
+                'key' => 'altg_available_token',
+                'value' => 40,
+                'compare' => '!=',
+                'type' => 'NUMERIC',
+            ],
+        ],
+        'fields' => ['ID', 'user_login', 'user_email'],
+        'number' => $limit,
+        'offset' => $offset,
+    ]);
+}
+
+$users = get_free_users();
+
+$i = 1;
